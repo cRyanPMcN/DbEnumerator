@@ -42,6 +42,13 @@ namespace DbEnumerator
             command.ExecuteNonQuery();
         }
 
+        // Fix an issue that stops the plan from being enumerated
+        // Once the code is complete to pull the plan this will be moved directly into the function that uses it;
+        public static string FixXMLPlan(string xmlPlan)
+        {
+            return xmlPlan.Replace("xmlns=\"http://schemas.microsoft.com/sqlserver/2004/07/showplan\"", "xmlns:ms=\"http://schemas.microsoft.com/sqlserver/2004/07/showplan\"");
+        }
+
         public string GetProgramInfo(DatabaseProgram program)
         {
             throw new NotImplementedException("GetProgramInfo requires more data from get DatabasePrograms");
@@ -100,10 +107,12 @@ namespace DbEnumerator
                     foreach (DataTable table in schema.Tables)
                     {
                         table.Columns = GetDistinctColumns(doc, database.Name, schema.Name, table.Name);
+#if DEBUG
                         foreach (string column in table.Columns)
                         {
                             Console.WriteLine($"{database.Name}\t{schema.Name}\t{table.Name}\t{column}");
                         }
+#endif
                     }
                 }
             }
