@@ -2,7 +2,7 @@
   "profiles": {
     "DbEnumerator": {
       "commandName": "Project",
-      "commandLineArgs": "DESKTOP-HB8K96T\\SQLEXPRESS DBEnumerator Enumerate"
+      "commandLineArgs": "DESKTOP-HB8K96T\\SQLEXPRESS DBEnumerator Enumerate AdventureWorks2017"
     }
   }
 }
