@@ -55,31 +55,10 @@ namespace DbEnumerator
         public List<Database> GetDistinctDatabases(XmlDocument doc)
         {
             XmlNodeList databaseNames = doc.DocumentElement.SelectNodes("//ColumnReference[@Database]/@Database");
-            try
-            {
-                List<string> distinctNames = (from names in databaseNames.Cast<XmlAttribute>() select names.Value).Distinct().ToList();
+            List<string> distinctNames = (from names in databaseNames.Cast<XmlAttribute>() select names.Value).Distinct().ToList();
 
-                return (from name in distinctNames 
-                        select new Database { Name = name, Schemas = null }).ToList();
-            }
-            catch (InvalidCastException)
-            {
-                // This catch should not be hit, it is only here just in case the above XPath statement is incorrect.
-                HashSet<string> uniqueDatabaseNames = new HashSet<string>();
-                foreach (XmlNode node in databaseNames)
-                {
-                    if (node is XmlAttribute)
-                    {
-                        uniqueDatabaseNames.Add((node as XmlAttribute).Value);
-                    }
-                }
-                List<Database> databases = new List<Database>();
-                foreach (string name in uniqueDatabaseNames)
-                {
-                    databases.Add(new Database { Name = name, Schemas = null });
-                }
-                return databases;
-            }
+            return (from name in distinctNames 
+                    select new Database { Name = name, Schemas = null }).ToList();
         }
 
         public List<Schema> GetDistinctSchemas(XmlDocument doc, string database)
