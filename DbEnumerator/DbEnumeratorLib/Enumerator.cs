@@ -119,6 +119,14 @@ namespace DbEnumerator
             return databases;
         }
 
+        static readonly Dictionary<string, ProgramType> ProgramTypeDictionaries = new Dictionary<string, ProgramType>()
+        {
+            { "V", ProgramType.View },
+            { "FN", ProgramType.ScalarValueFunction },
+            { "TF", ProgramType.TableValueFunction },
+            { "P", ProgramType.StoredProcedure }
+        };
+
         public List<DatabaseProgram> GetDatabasePrograms()
         {
             Databaseconnection.Open();
@@ -133,10 +141,11 @@ namespace DbEnumerator
             queryBuilder.AppendLine("    , DB_NAME()");
             queryBuilder.AppendLine("    , SCHEMA_NAME([schema_id])");
             queryBuilder.AppendLine("    , OBJECT_NAME([object_id])");
+            queryBuilder.AppendLine("    , [object_id]");
             queryBuilder.AppendLine("FROM sys.objects");
             queryBuilder.AppendLine("WHERE type_desc IN('SQL_SCALAR_FUNCTION', 'SQL_STORED_PROCEDURE', 'SQL_TABLE_VALUED_FUNCTION', 'VIEW')");
             queryBuilder.AppendLine("ORDER BY name");
-            
+
             string pullInformation = queryBuilder.ToString();
             queryBuilder.Clear();
 
@@ -147,7 +156,13 @@ namespace DbEnumerator
             List<DatabaseProgram> dbPrograms = new List<DatabaseProgram>();
             while (dataReader.Read())
             {
-                dbPrograms.Add(new DatabaseProgram { Database = dataReader[0].ToString(), Schema = dataReader[1].ToString(), Name = dataReader[2].ToString() });
+                dbPrograms.Add(new DatabaseProgram { 
+                    Type = ProgramTypeDictionaries[dataReader[0].ToString()],
+                    Database = dataReader[2].ToString(),
+                    Schema = dataReader[3].ToString(),
+                    Name = dataReader[4].ToString(),
+                    Id = dataReader[5].ToString() 
+                });
             }
             return dbPrograms;
         }
