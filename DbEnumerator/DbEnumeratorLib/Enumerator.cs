@@ -127,11 +127,16 @@ namespace DbEnumerator
             // --SELECT * FROM INFORMATION_SCHEMA.PARAMETERS
             Console.WriteLine("Pulling database information");
             StringBuilder queryBuilder = new StringBuilder();
-            queryBuilder.Append("SELECT v_routines.ROUTINE_CATALOG AS[Database], SCHEMA_NAME(t_objects.schema_id) AS[Schema], v_routines.ROUTINE_NAME AS[Name]");
-            queryBuilder.Append(" FROM INFORMATION_SCHEMA.ROUTINES v_routines");
-            queryBuilder.Append(" INNER JOIN sys.objects t_objects");
-            queryBuilder.Append(" ON v_routines.ROUTINE_NAME = t_objects.name");
-            queryBuilder.Append(" ORDER BY ROUTINE_TYPE");
+            queryBuilder.AppendLine("SELECT");
+            queryBuilder.AppendLine("    [type]");
+            queryBuilder.AppendLine("    , [type_desc]");
+            queryBuilder.AppendLine("    , DB_NAME()");
+            queryBuilder.AppendLine("    , SCHEMA_NAME([schema_id])");
+            queryBuilder.AppendLine("    , OBJECT_NAME([object_id])");
+            queryBuilder.AppendLine("FROM sys.objects");
+            queryBuilder.AppendLine("WHERE type_desc IN('SQL_SCALAR_FUNCTION', 'SQL_STORED_PROCEDURE', 'SQL_TABLE_VALUED_FUNCTION', 'VIEW')");
+            queryBuilder.AppendLine("ORDER BY name");
+            
             string pullInformation = queryBuilder.ToString();
             queryBuilder.Clear();
 
