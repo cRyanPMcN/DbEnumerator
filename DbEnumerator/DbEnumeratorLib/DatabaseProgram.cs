@@ -14,6 +14,7 @@ namespace DbEnumerator
         public string Database { get; set; }
         public string Schema { get; set; }
         public string Name { get; set; }
+        public string Id { get; set; }
         public List<Parameter> Parameters { get; set; }
         public override string ToString()
         {
