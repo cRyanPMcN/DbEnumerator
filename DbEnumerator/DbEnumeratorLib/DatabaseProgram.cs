@@ -8,7 +8,11 @@ namespace DbEnumerator
         public class Parameter
         {
             public string Name { get; set; }
-            public object Value { get; set; }
+            public string Type { get; set; }
+            public bool IsNullable { get; set; }
+            // Force value to null, query plans stay the same
+            // Written this way so that later it is easier to properly implement
+            public object Value { get { return null; } }
         }
         public ProgramType Type {get;set;}
         public string Database { get; set; }
