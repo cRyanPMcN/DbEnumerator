@@ -6,6 +6,6 @@ namespace DbEnumerator
     public class Schema
     {
         public string Name { get; set; }
-        public IEnumerable<DataTable> Tables { get; set; }
+        public ICollection<DataTable> Tables { get; set; }
     }
 }

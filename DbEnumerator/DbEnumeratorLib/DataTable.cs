@@ -6,6 +6,6 @@ namespace DbEnumerator
     public class DataTable
     {
         public string Name { get; set; }
-        public IEnumerable<string> Columns { get; set; }
+        public ICollection<string> Columns { get; set; }
     }
 }

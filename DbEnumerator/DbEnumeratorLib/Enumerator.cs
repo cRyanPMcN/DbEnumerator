@@ -5,12 +5,17 @@ using System.Xml;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Xml.Linq;
+using System.Text.RegularExpressions;
 
 namespace DbEnumerator
 {
     public class Enumerator
     {
         public SqlConnection DatabaseConnection { get; set; }
+        #region Constant SQL Queries
+        const string SHOW_XML_PLAN_ON = "SET SHOWPLAN_XML ON";
+        const string SHOW_XML_PLAN_OFF = "SET SHOWPLAN_XML OFF";
+        #endregion
         public Enumerator(SqlConnection dbConn)
         {
             DatabaseConnection = dbConn;
@@ -19,14 +24,10 @@ namespace DbEnumerator
 
         ~Enumerator()
         {
-            // Safety before efficiency
             SetXMLPlanOff();
             DatabaseConnection.Close();
         }
-        #region Constant SQL Queries
-        const string SHOW_XML_PLAN_ON = "SET SHOWPLAN_XML ON";
-        const string SHOW_XML_PLAN_OFF = "SET SHOWPLAN_XML OFF";
-        #endregion
+
         public void SetXMLPlanOn()
         {
             using SqlCommand command = DatabaseConnection.CreateCommand();
@@ -57,7 +58,7 @@ namespace DbEnumerator
             return xmlPlan.Replace("xmlns=\"http://schemas.microsoft.com/sqlserver/2004/07/showplan\"", "xmlns:ms=\"http://schemas.microsoft.com/sqlserver/2004/07/showplan\"");
         }
 
-        public string GetProgramInfo(DatabaseProgram program)
+        public string GetProgramInfo(IDatabaseProgram program)
         {
             throw new NotImplementedException("GetProgramInfo requires more data from get DatabasePrograms");
         }
@@ -67,75 +68,113 @@ namespace DbEnumerator
             return doc.DocumentElement.SelectNodes("//ColumnReference[@Database]");
         }
 
-        public IEnumerable<Database> GetDistinctDatabases(XmlDocument doc)
+        public ICollection<Database> GetDistinctDatabases(XmlDocument doc, XmlNamespaceManager xnsm)
         {
-            XmlNodeList databaseNames = doc.DocumentElement.SelectNodes("//ColumnReference[@Database]/@Database");
+            XmlNodeList databaseNames = doc.DocumentElement.SelectNodes("//ColumnReference[@Database]/@Database", xnsm);
             List<string> distinctNames = (from names in databaseNames.Cast<XmlAttribute>() select names.Value).Distinct().ToList();
 
             return (from name in distinctNames 
-                    select new Database { Name = name, Schemas = null });
+                    select new Database { Name = name, Schemas = null }).ToList();
         }
 
-        public IEnumerable<Schema> GetDistinctSchemas(XmlDocument doc, string database)
+        public ICollection<Schema> GetDistinctSchemas(XmlDocument doc, XmlNamespaceManager xnsm, string database)
         {
-            XmlNodeList schemaNames = doc.DocumentElement.SelectNodes($"//ColumnReference[@Database='{database}']/@Schema");
+            XmlNodeList schemaNames = doc.DocumentElement.SelectNodes($"//ColumnReference[@Database='{database}']/@Schema", xnsm);
 
             List<string> distinctNames = (from names in schemaNames.Cast<XmlAttribute>() select names.Value).Distinct().ToList();
 
             return (from name in distinctNames 
-                    select new Schema { Name = name, Tables = null });
+                    select new Schema { Name = name, Tables = null }).ToList();
         }
 
-        public IEnumerable<DataTable> GetDistinctTables(XmlDocument doc, string database, string schema)
+        public ICollection<DataTable> GetDistinctTables(XmlDocument doc, XmlNamespaceManager xnsm, string database, string schema)
         {
-            XmlNodeList tableNames = doc.DocumentElement.SelectNodes($"//ColumnReference[@Database='{database}' and @Schema='{schema}']/@Table");
+            XmlNodeList tableNames = doc.DocumentElement.SelectNodes($"//ColumnReference[@Database='{database}' and @Schema='{schema}']/@Table", xnsm);
             List<string> distinctNames = (from names in tableNames.Cast<XmlAttribute>() select names.Value).Distinct().ToList();
 
             return (from name in distinctNames 
-                    select new DataTable { Name = name, Columns = null });
+                    select new DataTable { Name = name, Columns = null }).ToList();
         }
 
-        public IEnumerable<string> GetDistinctColumns(XmlDocument doc, string database, string schema, string table)
+        public ICollection<string> GetDistinctColumns(XmlDocument doc, XmlNamespaceManager xnsm, string database, string schema, string table)
         {
-            XmlNodeList columnNames = doc.DocumentElement.SelectNodes($"//ColumnReference[@Database='{database}' and @Schema='{schema}' and @Table='{table}']/@Column");
+            XmlNodeList columnNames = doc.DocumentElement.SelectNodes($"//ColumnReference[@Database='{database}' and @Schema='{schema}' and @Table='{table}']/@Column", xnsm);
 
             return (from names in columnNames.Cast<XmlAttribute>()
-                    select names.Value).Distinct();
+                    select names.Value).Distinct().ToList();
         }
 
-        public IEnumerable<Database> ConstructDatabaseList(XmlDocument doc)
+        public ICollection<Database> DatabaseCollectionFactory(XmlDocument doc)
         {
-            IEnumerable<Database> databases = GetDistinctDatabases(doc);
+            XmlNamespaceManager xnsm = new XmlNamespaceManager(doc.NameTable);
+            xnsm.AddNamespace("ms", "http://schemas.microsoft.com/sqlserver/2004/07/showplan/sql2017/showplanxml.xsd");
+            xnsm.AddNamespace("xsi", "http://www.w3.org/2001/XMLSchema-instance");
+            xnsm.AddNamespace("xsd", "http://www.w3.org/2001/XMLSchema");
+            ICollection<Database> databases = GetDistinctDatabases(doc, xnsm);
             foreach (Database database in databases)
             {
-                database.Schemas = GetDistinctSchemas(doc, database.Name);
+                database.Schemas = GetDistinctSchemas(doc, xnsm, database.Name);
                 foreach (Schema schema in database.Schemas)
                 {
-                    schema.Tables = GetDistinctTables(doc, database.Name, schema.Name);
+                    schema.Tables = GetDistinctTables(doc, xnsm, database.Name, schema.Name);
                     foreach (DataTable table in schema.Tables)
                     {
-                        table.Columns = GetDistinctColumns(doc, database.Name, schema.Name, table.Name);
-#if DEBUG
+                        table.Columns = GetDistinctColumns(doc, xnsm, database.Name, schema.Name, table.Name);
                         foreach (string column in table.Columns)
                         {
-                            Console.WriteLine($"{database.Name}\t{schema.Name}\t{table.Name}\t{column}");
+                            System.Diagnostics.Debug.WriteLine($"{database.Name}\t{schema.Name}\t{table.Name}\t{column}");
                         }
-#endif
                     }
                 }
             }
             return databases;
         }
 
-        // In C++ this would be defined in the function, C# does not allow in-function statically allocated variables
-        static readonly Dictionary<string, ProgramType> ProgramTypeDictionaries = new Dictionary<string, ProgramType>
+        public IDatabaseProgram DatabaseProgramFactory(SqlDataReader programData)
         {
-            { "V", ProgramType.View },
-            { "FN", ProgramType.ScalarValueFunction },
-            { "TF", ProgramType.TableValueFunction },
-            { "P", ProgramType.StoredProcedure }
-        };
-        public IEnumerable<DatabaseProgram> GetDatabasePrograms()
+            switch (programData.GetString(0).Trim())
+            {
+                case "V":
+                    return new DatabaseView
+                    {
+                        Database = programData.GetString(2),
+                        Schema = programData.GetString(3),
+                        Name = programData.GetString(4),
+                        Id = programData.GetInt32(5),
+                        Parameters = new List<Parameter>()
+                    };
+                case "FN":
+                    return new DatabaseScalarFunction
+                    {
+                        Database = programData.GetString(2),
+                        Schema = programData.GetString(3),
+                        Name = programData.GetString(4),
+                        Id = programData.GetInt32(5),
+                        Parameters = new List<Parameter>()
+                    };
+                case "TF":
+                    return new DatabaseTableFunction
+                    {
+                        Database = programData.GetString(2),
+                        Schema = programData.GetString(3),
+                        Name = programData.GetString(4),
+                        Id = programData.GetInt32(5),
+                        Parameters = new List<Parameter>()
+                    };
+                case "P":
+                    return new DatabaseProcedure
+                    {
+                        Database = programData.GetString(2),
+                        Schema = programData.GetString(3),
+                        Name = programData.GetString(4),
+                        Id = programData.GetInt32(5),
+                        Parameters = new List<Parameter>()
+                    };
+                default:
+                    throw new ArgumentException($"Unexpected DatabaseProgram Type of {programData.GetString(0)} in Enumerator::DatabaseProgramFactory(SqlDataReader)");
+            }
+        }
+        public IEnumerable<IDatabaseProgram> GetDatabasePrograms()
         {
             Console.WriteLine("Pulling database information");
             StringBuilder queryBuilder = new StringBuilder();
@@ -156,21 +195,15 @@ namespace DbEnumerator
             queryBuilder.Clear();
             command.CommandType = System.Data.CommandType.Text;
             using SqlDataReader dataReader = command.ExecuteReader();
-            List<DatabaseProgram> dbPrograms = new List<DatabaseProgram>();
+            List<IDatabaseProgram> dbPrograms = new List<IDatabaseProgram>();
             while (dataReader.Read())
             {
-                dbPrograms.Add(new DatabaseProgram { 
-                    Type = ProgramTypeDictionaries[dataReader.GetString(0)],
-                    Database = dataReader.GetString(2),
-                    Schema = dataReader.GetString(3),
-                    Name = dataReader.GetString(4),
-                    Id = dataReader.GetString(5) 
-                });
+                dbPrograms.Add(DatabaseProgramFactory(dataReader));
             }
             return dbPrograms;
         }
 
-        public void GetProgramParameters(DatabaseProgram program)
+        public void GetProgramParameters(IDatabaseProgram program)
         {
             Console.WriteLine($"Pulling parameters for {program.ToString()}");
 
@@ -179,8 +212,6 @@ namespace DbEnumerator
             queryBuilder.AppendLine("	[name]");
             queryBuilder.AppendLine("	, TYPE_NAME([user_type_id])");
             queryBuilder.AppendLine("	, [is_nullable]");
-            queryBuilder.AppendLine("	, TYPE_NAME([system_type_id])");
-            queryBuilder.AppendLine("	, *");
             queryBuilder.AppendLine("FROM sys.parameters");
             queryBuilder.AppendLine($"WHERE [is_output] = 0 AND [object_id] = {program.Id}");
             queryBuilder.AppendLine("ORDER BY [object_id], [parameter_id]");
@@ -192,25 +223,46 @@ namespace DbEnumerator
             using SqlDataReader dataReader = command.ExecuteReader();
             while (dataReader.Read())
             {
-                program.Parameters.Add(new DatabaseProgram.Parameter
+                program.Parameters.Add(new Parameter
                 {
                     Name = dataReader.GetString(0),
                     Type = dataReader.GetString(1),
                     IsNullable = dataReader.GetBoolean(2),
                     // TODO: Implement Value properly
-                    // Dictionary would hold default values for all types
+                    // Planned to have a dictionary which holds default values for all types
                     // This seems unreasonable to implement, will be implemented if a query plan changes based on Arguments being inputted
                     // Value = ParameterTypeDictionary[dataReader.GetString(3)]
                 });
             }
         }
 
-        public void GetProgramParameters(IEnumerable<DatabaseProgram> programList)
+        public void GetProgramParameters(IEnumerable<IDatabaseProgram> programList)
         {
-            foreach (DatabaseProgram program in programList)
+            foreach (IDatabaseProgram program in programList)
             {
                 GetProgramParameters(program);
             }
+        }
+
+        public string GetQueryPlan(IDatabaseProgram program)
+        {
+            Console.WriteLine($"Pulling query plan for {program.ToString()}");
+            
+            using SqlCommand command = DatabaseConnection.CreateCommand();
+            command.CommandText = program.QueryString;
+            command.CommandType = System.Data.CommandType.Text;
+            using SqlDataReader dataReader = command.ExecuteReader();
+            List<string> queryResults = new List<string>();
+            while (dataReader.Read())
+            {
+                queryResults.Add(dataReader.GetString(0).Replace("xmlns=\"http://schemas.microsoft.com/sqlserver/2004/07/showplan\"", "xmlns:ms=\"http://schemas.microsoft.com/sqlserver/2004/07/showplan\""));
+            }
+            if (queryResults.Count != 1)
+            {
+                // TODO: Switch Exception to more descriptive exception name
+                throw new Exception($"Error getting query plan for {program.ToString()}: Unexpected number of query plans '{queryResults.Count}' was returned by the database.");
+            }
+            return queryResults[0];
         }
     }
 }
