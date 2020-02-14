@@ -61,7 +61,7 @@ namespace DbEnumerator
         public Int32 Id { get; set; }
         public ICollection<Parameter> Parameters { get; set; }
         public string QueryString => $"SELECT {ToString()}{ParameterString}";
-        public string ParameterString => $"({string.Join(", ", from parameter in Parameters select $"{parameter.Name} = {parameter.Value ?? "NULL"}")})";
+        public string ParameterString => $"({string.Join(", ", from parameter in Parameters select $"{parameter.Value ?? "NULL"}")})";
         public override string ToString()
         {
             return $"{Database}.{Schema}.{Name}";
