@@ -174,24 +174,14 @@ namespace DbEnumerator
                     throw new ArgumentException($"Unexpected DatabaseProgram Type of {programData.GetString(0)} in Enumerator::DatabaseProgramFactory(SqlDataReader)");
             }
         }
-        public IEnumerable<IDatabaseProgram> GetDatabasePrograms()
+        static readonly string QueryGetDatabasePrograms =
+            "SELECT [type], [type_desc], DB_NAME(), SCHEMA_NAME([schema_id]), OBJECT_NAME([object_id]), [object_id] FROM sys.objects " +
+            "WHERE type_desc IN('SQL_SCALAR_FUNCTION', 'SQL_STORED_PROCEDURE', 'SQL_TABLE_VALUED_FUNCTION', 'VIEW') " +
+            "ORDER BY name";
+        public ICollection<IDatabaseProgram> GetDatabasePrograms()
         {
-            StringBuilder queryBuilder = new StringBuilder();
-            queryBuilder.AppendLine("SELECT");
-            queryBuilder.AppendLine("    [type]");
-            queryBuilder.AppendLine("    , [type_desc]");
-            queryBuilder.AppendLine("    , DB_NAME()");
-            queryBuilder.AppendLine("    , SCHEMA_NAME([schema_id])");
-            queryBuilder.AppendLine("    , OBJECT_NAME([object_id])");
-            queryBuilder.AppendLine("    , [object_id]");
-            queryBuilder.AppendLine("FROM sys.objects");
-            queryBuilder.AppendLine("WHERE type_desc IN('SQL_SCALAR_FUNCTION', 'SQL_STORED_PROCEDURE', 'SQL_TABLE_VALUED_FUNCTION', 'VIEW')");
-            queryBuilder.AppendLine("ORDER BY name");
-
-
             using SqlCommand command = DatabaseConnection.CreateCommand();
-            command.CommandText = queryBuilder.ToString();
-            queryBuilder.Clear();
+            command.CommandText = QueryGetDatabasePrograms;
             command.CommandType = System.Data.CommandType.Text;
             using SqlDataReader dataReader = command.ExecuteReader();
             List<IDatabaseProgram> dbPrograms = new List<IDatabaseProgram>();
@@ -201,21 +191,15 @@ namespace DbEnumerator
             }
             return dbPrograms;
         }
-
+        static readonly string QueryGetProgramParameters =
+            "SELECT [name], TYPE_NAME([user_type_id]), [is_nullable] FROM sys.parameters " +
+            "WHERE [is_output] = 0 AND [object_id] = @ProgramId " +
+            "ORDER BY [object_id], [parameter_id]";
         public void GetProgramParameters(IDatabaseProgram program)
         {
-            StringBuilder queryBuilder = new StringBuilder();
-            queryBuilder.AppendLine("SELECT");
-            queryBuilder.AppendLine("	[name]");
-            queryBuilder.AppendLine("	, TYPE_NAME([user_type_id])");
-            queryBuilder.AppendLine("	, [is_nullable]");
-            queryBuilder.AppendLine("FROM sys.parameters");
-            queryBuilder.AppendLine($"WHERE [is_output] = 0 AND [object_id] = {program.Id}");
-            queryBuilder.AppendLine("ORDER BY [object_id], [parameter_id]");
-
             using SqlCommand command = DatabaseConnection.CreateCommand();
-            command.CommandText = queryBuilder.ToString();
-            queryBuilder.Clear();
+            command.CommandText = QueryGetProgramParameters;
+            command.Parameters.AddWithValue("@ProgramId", program.Id);
             command.CommandType = System.Data.CommandType.Text;
             using SqlDataReader dataReader = command.ExecuteReader();
             while (dataReader.Read())
