@@ -16,6 +16,7 @@ namespace DbEnumerator
         const string SHOW_XML_PLAN_ON = "SET SHOWPLAN_XML ON";
         const string SHOW_XML_PLAN_OFF = "SET SHOWPLAN_XML OFF";
         #endregion
+
         public Enumerator(SqlConnection dbConn)
         {
             DatabaseConnection = dbConn;
@@ -33,34 +34,15 @@ namespace DbEnumerator
             using SqlCommand command = DatabaseConnection.CreateCommand();
             command.CommandText = SHOW_XML_PLAN_ON;
             command.CommandType = System.Data.CommandType.Text;
-            // ExecuteNonQuery returns a number of rows affected
-            // SHOW_XML_PLAN_ON will not return a row
-            // therefore this does not provie a method of checking
-            // whether the command was successful
             command.ExecuteNonQuery();
         }
+
         public void SetXMLPlanOff()
         {
             using SqlCommand command = DatabaseConnection.CreateCommand();
             command.CommandText = SHOW_XML_PLAN_OFF;
             command.CommandType = System.Data.CommandType.Text;
-            // ExecuteNonQuery returns a number of rows affected
-            // SHOW_XML_PLAN_ON will not return a row
-            // therefore this does not provie a method of checking
-            // whether the command was successful
             command.ExecuteNonQuery();
-        }
-
-        // Fix an issue that stops the plan from being enumerated
-        // Once the code is complete to pull the plan this will be moved directly into the function that uses it;
-        public static string FixXMLPlan(string xmlPlan)
-        {
-            return xmlPlan.Replace("xmlns=\"http://schemas.microsoft.com/sqlserver/2004/07/showplan\"", "xmlns:ms=\"http://schemas.microsoft.com/sqlserver/2004/07/showplan\"");
-        }
-
-        public string GetProgramInfo(IDatabaseProgram program)
-        {
-            throw new NotImplementedException("GetProgramInfo requires more data from get DatabasePrograms");
         }
 
         public XmlNodeList GetColumnReferenceNodes(XmlDocument doc)
@@ -174,6 +156,7 @@ namespace DbEnumerator
                     throw new ArgumentException($"Unexpected DatabaseProgram Type of {programData.GetString(0)} in Enumerator::DatabaseProgramFactory(SqlDataReader)");
             }
         }
+        
         static readonly string QueryGetDatabasePrograms =
             "SELECT [type], [type_desc], DB_NAME(), SCHEMA_NAME([schema_id]), OBJECT_NAME([object_id]), [object_id] FROM sys.objects " +
             "WHERE type_desc IN('SQL_SCALAR_FUNCTION', 'SQL_STORED_PROCEDURE', 'SQL_TABLE_VALUED_FUNCTION', 'VIEW') " +
@@ -191,6 +174,7 @@ namespace DbEnumerator
             }
             return dbPrograms;
         }
+
         static readonly string QueryGetProgramParameters =
             "SELECT [name], TYPE_NAME([user_type_id]), [is_nullable] FROM sys.parameters " +
             "WHERE [is_output] = 0 AND [object_id] = @ProgramId " +
