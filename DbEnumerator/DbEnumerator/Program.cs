@@ -10,6 +10,7 @@ using System.IO;
 using System.Data.SqlClient;
 using System.Data.Sql;
 using DbEnumerator;
+using System.Diagnostics;
 
 namespace DbEnuemratorCLI
 {
@@ -30,86 +31,113 @@ namespace DbEnuemratorCLI
             Console.WriteLine("DbEnumerator.exe ([Connectionstring]|[Data Source] [UserId] [Password] [Initial Catalog]");
         }
 
-        static void Main(string[] args)
+        static bool RunEnumerator(SqlConnection dbConn)
         {
-            //XmlReader xmlReader = XmlReader.Create(new System.IO.StreamReader(XML_FILE_LOCATION));
-            //xmlReader.Read();
-            //XmlDocument doc = new XmlDocument();
-            //doc.LoadXml(xmlFileText.Replace("xmlns=\"http://schemas.microsoft.com/sqlserver/2004/07/showplan\"", "xmlns:ms=\"http://schemas.microsoft.com/sqlserver/2004/07/showplan\""));
-            //XmlElement root = doc.DocumentElement;
-
-            Console.WriteLine("Welcome to DbEnumerator");
-            Console.WriteLine("Checking program Args");
-            if (args.Length > 0)
+            Enumerator dbEnumerator = new Enumerator(dbConn);
+            ICollection<IDatabaseProgram> programs = dbEnumerator.GetDatabasePrograms();
+            // Scope to separate programCount from rest of function
             {
-                if (args.Length == 4)
+                int programCount = 0;
+                foreach (IDatabaseProgram p in programs)
                 {
-                    SqlConnectionStringBuilder sqlConnBuilder = new SqlConnectionStringBuilder();
+                    dbEnumerator.GetProgramParameters(p);
+                    Console.WriteLine($"[{programCount++}]: {p.ToString()}");
+                }
+            }
+            int selectedProgram = -1;
+            while (selectedProgram < 0 || selectedProgram > programs.Count-1) {
+                Console.WriteLine($"Please enter an integer between 0 and {programs.Count-1}.");
+                try
+                {
+                    selectedProgram = int.Parse(Console.ReadLine());
+                }
+                catch (ArgumentNullException)
+                {
+                    Console.WriteLine("No input detected.");
+                }
+                catch (FormatException)
+                {
+                    Console.WriteLine("Invalid input detected.");
+                }
+                catch (OverflowException)
+                {
+                    Console.WriteLine("Input was too large to parse.");
+                }
+            }
 
-                    sqlConnBuilder.DataSource = args[0];
-                    sqlConnBuilder.UserID = args[1];
-                    sqlConnBuilder.Password = args[2];
-                    sqlConnBuilder.InitialCatalog = args[3];
+            dbEnumerator.SetXMLPlanOn();
+            XmlDocument doc = new XmlDocument();
+            string qryplan = dbEnumerator.GetQueryPlan(programs.Skip(selectedProgram).First());
+            StringReader strReader = new StringReader(qryplan);
+            doc.Load(strReader);
 
-                    using SqlConnection dbConn = new SqlConnection(sqlConnBuilder.ConnectionString);
-                    Enumerator dbEnumerator = new Enumerator(dbConn);
-                    IEnumerable<IDatabaseProgram> programs = dbEnumerator.GetDatabasePrograms();
-                    foreach (IDatabaseProgram p in programs)
+            IEnumerable<Database> queryData = dbEnumerator.DatabaseCollectionFactory(doc);
+            foreach (Database database in queryData)
+            {
+                foreach (Schema schema in database.Schemas)
+                {
+                    foreach (DataTable table in schema.Tables)
                     {
-                        dbEnumerator.GetProgramParameters(p);
-                        //Console.WriteLine(p.QueryString);
-                    }
-                    dbEnumerator.SetXMLPlanOn();
-                    XmlDocument doc = new XmlDocument();
-                    string qryplan = dbEnumerator.GetQueryPlan(programs.Skip(2).First());
-                    //Console.WriteLine(qryplan);
-                    StringReader strReader = new StringReader(qryplan);//dbEnumerator.GetQueryPlan(programs.Skip(2).First()));
-                    doc.Load(strReader);
-
-                    IEnumerable<Database> queryData = dbEnumerator.DatabaseCollectionFactory(doc);
-                    foreach (Database database in queryData)
-                    {
-                        foreach (Schema schema in database.Schemas)
+                        foreach (string column in table.Columns)
                         {
-                            foreach (DataTable table in schema.Tables)
-                            {
-                                foreach (string column in table.Columns)
-                                {
-                                    Console.WriteLine($"{database.Name}.{schema.Name}.{table.Name}.{column}");
-                                }
-                            }
+                            Console.WriteLine($"{database.Name}.{schema.Name}.{table.Name}.{column}");
                         }
                     }
-                    dbEnumerator.SetXMLPlanOff();
-                    //foreach (IDatabaseProgram program in programs)
-                    //{
-                    //    Console.WriteLine(program.ToString());
-                    //}
                 }
-                else if (args.Length == 1)
+            }
+            dbEnumerator.SetXMLPlanOff();
+            return true;
+        }
+
+        static void Main(string[] args)
+        {
+            try
+            {
+
+                Console.WriteLine("Welcome to DbEnumerator");
+                Console.WriteLine("Checking program Args");
+                if (args.Length > 0)
                 {
-                    using SqlConnection dbConn = new SqlConnection(args[0]);
-                    Enumerator dbEnumerator = new Enumerator(dbConn);
-                    IEnumerable<IDatabaseProgram> dbInfo = dbEnumerator.GetDatabasePrograms();
-                    IEnumerable<IDatabaseProgram> programs = dbEnumerator.GetDatabasePrograms();
-                    foreach (IDatabaseProgram program in programs)
+                    if (args.Length == 4)
                     {
-                        Console.WriteLine(program.ToString());
+                        SqlConnectionStringBuilder sqlConnBuilder = new SqlConnectionStringBuilder()
+                        {
+                            DataSource = args[0],
+                            UserID = args[1],
+                            Password = args[2],
+                            InitialCatalog = args[3],
+                        };
+                        RunEnumerator(new SqlConnection(sqlConnBuilder.ConnectionString));
+                    }
+                    else if (args.Length == 1)
+                    {
+                        using SqlConnection dbConn = new SqlConnection(args[0]);
+                        RunEnumerator(new SqlConnection(args[0]));
+                    }
+                    else
+                    {
+                        PrintProgramArguments();
+                        return;
                     }
                 }
                 else
                 {
-                    PrintProgramArguments();
-                    return;
+                    Console.WriteLine("No arguments found, please enter a MSSQL-Server Connection string to continue:");
+                    string connstring = Console.ReadLine();
+                    using SqlConnection dbConn = new SqlConnection(connstring);
+                    RunEnumerator(dbConn);
                 }
             }
-            else
+            catch (Exception ex)
             {
-                Console.WriteLine("No arguments found, please enter a MSSQL-Server Connection string to continue:");
-                string connstring = Console.ReadLine();
-                using SqlConnection dbConn = new SqlConnection(connstring);
-                dbConn.Open();
-
+                // Currently dropping StackTrace
+                Console.WriteLine($"{ex.GetType().FullName}: {ex.Message}");
+                Exception innerException = ex.InnerException;
+                while (innerException != null)
+                {
+                    Console.WriteLine($"{ex.GetType().FullName}: {ex.Message}");
+                    innerException = ex.InnerException;
+                }
             }
         }
     }
