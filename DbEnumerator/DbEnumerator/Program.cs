@@ -44,12 +44,12 @@ namespace DbEnuemratorCLI
                     Console.WriteLine($"[{programCount++}]: {p.ToString()}");
                 }
             }
-            int selectedProgram = -1;
-            while (selectedProgram < 0 || selectedProgram > programs.Count-1) {
+            int selectedIndex = -1;
+            while (selectedIndex < 0 || selectedIndex > programs.Count-1) {
                 Console.WriteLine($"Please enter an integer between 0 and {programs.Count-1}.");
                 try
                 {
-                    selectedProgram = int.Parse(Console.ReadLine());
+                    selectedIndex = int.Parse(Console.ReadLine());
                 }
                 catch (ArgumentNullException)
                 {
@@ -65,14 +65,15 @@ namespace DbEnuemratorCLI
                 }
             }
 
+            IDatabaseProgram selectedProgram = programs.ElementAt(selectedIndex);
             dbEnumerator.SetXMLPlanOn();
             XmlDocument doc = new XmlDocument();
-            string qryplan = dbEnumerator.GetQueryPlan(programs.Skip(selectedProgram).First());
+            string qryplan = dbEnumerator.GetQueryPlan(selectedProgram);
             StringReader strReader = new StringReader(qryplan);
             doc.Load(strReader);
 
-            IEnumerable<Database> queryData = dbEnumerator.DatabaseCollectionFactory(doc);
-            foreach (Database database in queryData)
+            ICollection<Database> databases = dbEnumerator.DatabaseCollectionFactory(doc);
+            foreach (Database database in databases)
             {
                 foreach (Schema schema in database.Schemas)
                 {
@@ -84,6 +85,10 @@ namespace DbEnuemratorCLI
                         }
                     }
                 }
+            }
+            if (databases.Count == 0)
+            {
+                Console.WriteLine($"Query plan for {selectedProgram.ToString()} does not contain a reference to a database column");
             }
             dbEnumerator.SetXMLPlanOff();
             return true;
