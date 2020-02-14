@@ -176,7 +176,6 @@ namespace DbEnumerator
         }
         public IEnumerable<IDatabaseProgram> GetDatabasePrograms()
         {
-            Console.WriteLine("Pulling database information");
             StringBuilder queryBuilder = new StringBuilder();
             queryBuilder.AppendLine("SELECT");
             queryBuilder.AppendLine("    [type]");
@@ -205,8 +204,6 @@ namespace DbEnumerator
 
         public void GetProgramParameters(IDatabaseProgram program)
         {
-            Console.WriteLine($"Pulling parameters for {program.ToString()}");
-
             StringBuilder queryBuilder = new StringBuilder();
             queryBuilder.AppendLine("SELECT");
             queryBuilder.AppendLine("	[name]");
@@ -246,8 +243,6 @@ namespace DbEnumerator
 
         public string GetQueryPlan(IDatabaseProgram program)
         {
-            Console.WriteLine($"Pulling query plan for {program.ToString()}");
-            
             using SqlCommand command = DatabaseConnection.CreateCommand();
             command.CommandText = program.QueryString;
             command.CommandType = System.Data.CommandType.Text;

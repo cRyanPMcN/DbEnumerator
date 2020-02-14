@@ -23,6 +23,7 @@ namespace DbEnumerator
         public Int32 Id { get; set; }
         public ICollection<Parameter> Parameters { get; set; }
         public string QueryString { get; }
+        public string ParameterString { get; }
     }
     public class DatabaseView : IDatabaseProgram
     {
@@ -31,7 +32,8 @@ namespace DbEnumerator
         public string Name { get; set; }
         public Int32 Id { get; set; }
         public ICollection<Parameter> Parameters { get; set; }
-        public string QueryString => $"SELECT * FROM {ToString()}";
+        public string QueryString => $"SELECT * FROM {ToString()}{ParameterString}";
+        public string ParameterString => $"";
         public override string ToString()
         {
             return $"{Database}.{Schema}.{Name}";
@@ -44,10 +46,11 @@ namespace DbEnumerator
         public string Name { get; set; }
         public Int32 Id { get; set; }
         public ICollection<Parameter> Parameters { get; set; }
-        public string QueryString => $"EXEC {ToString()}";
+        public string QueryString => $"EXEC {ToString()} {ParameterString}";
+        public string ParameterString => $"{string.Join(", ", from parameter in Parameters select $"{parameter.Name} = {parameter.Value ?? "NULL"}")}";
         public override string ToString()
         {
-            return $"{Database}.{Schema}.{Name} {string.Join(",", from parameter in Parameters select $"{parameter.Name} = {parameter.Value ?? "NULL"}")}";
+            return $"{Database}.{Schema}.{Name}";
         }
     }
     public class DatabaseScalarFunction : IDatabaseProgram
@@ -57,10 +60,11 @@ namespace DbEnumerator
         public string Name { get; set; }
         public Int32 Id { get; set; }
         public ICollection<Parameter> Parameters { get; set; }
-        public string QueryString => $"SELECT {ToString()}";
+        public string QueryString => $"SELECT {ToString()}{ParameterString}";
+        public string ParameterString => $"({string.Join(", ", from parameter in Parameters select $"{parameter.Name} = {parameter.Value ?? "NULL"}")})";
         public override string ToString()
         {
-            return $"{Database}.{Schema}.{Name}({string.Join(",", from parameter in Parameters select parameter.Value ?? "NULL")})";
+            return $"{Database}.{Schema}.{Name}";
         }
     }
     public class DatabaseTableFunction : IDatabaseProgram
@@ -70,10 +74,11 @@ namespace DbEnumerator
         public string Name { get; set; }
         public Int32 Id { get; set; }
         public ICollection<Parameter> Parameters { get; set; }
-        public string QueryString => $"SELECT * FROM {ToString()}";
+        public string QueryString => $"SELECT * FROM {ToString()}{ParameterString}";
+        public string ParameterString => $"({string.Join(", ", from parameter in Parameters select parameter.Value ?? "NULL")})";
         public override string ToString()
         {
-            return $"{Database}.{Schema}.{Name}({string.Join(",", from parameter in Parameters select parameter.Value ?? "NULL")})";
+            return $"{Database}.{Schema}.{Name}";
         }
     }
 }
