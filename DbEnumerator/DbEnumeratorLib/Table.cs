@@ -3,11 +3,11 @@ using System.Collections.Generic;
 
 namespace DbEnumeratorLib
 {
-    public class Schema : IEquatable<Schema>
+    public class Table : IEquatable<Table>
     {
         public string Name { get; set; }
-        public ICollection<Table> Tables { get; set; }
-        bool IEquatable<Schema>.Equals(Schema other)
+        public ICollection<string> Columns { get; set; }
+        bool IEquatable<Table>.Equals(Table other)
         {
             if (other is null)
             {
@@ -17,8 +17,8 @@ namespace DbEnumeratorLib
             return this.GetHashCode() == other.GetHashCode();
         }
 
-        public override bool Equals(object obj) => this.Equals(obj as Schema);
+        public override bool Equals(object obj) => this.Equals(obj as Table);
 
-        public override int GetHashCode() => HashCode.Combine(Name, Tables);
+        public override int GetHashCode() => HashCode.Combine(Name, Columns);
     }
 }
